@@ -94,25 +94,23 @@ class cnn2D(nn.Module):
         # Compute attention weights
         attention_weights = self.attention(x)  # (Batch, num_kernels)
 
-        # Reshape input for grouped convolution
-        x = x.view(1, -1, height, width)  # Combine batch and channel dimensions
-
         # Flatten kernel weights for dynamic aggregation
         weight_flat = self.weight.view(self.num_kernels, -1)  # (num_kernels, out_channels * in_channels // groups * kernel_size^2)
 
         # Dynamically aggregate weights and bias
-        aggregated_weight = torch.mm(attention_weights, weight_flat).view(
+        aggregated_weight = torch.matmul(attention_weights, weight_flat).view(
             batch_size * self.out_channels, 
             self.in_channels // self.groups, 
             self.kernel_size, 
             self.kernel_size
         )
         if self.bias is not None:
-            aggregated_bias = torch.mm(attention_weights, self.bias).view(-1)
+            aggregated_bias = torch.matmul(attention_weights, self.bias).view(-1)
         else:
             aggregated_bias = None
 
         # Perform convolution
+        x = x.view(1, -1, height, width)  # Combine batch and channel dimensions for grouped convolution
         output = F.conv2d(
             x, 
             weight=aggregated_weight, 
