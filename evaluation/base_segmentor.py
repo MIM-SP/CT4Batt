@@ -12,6 +12,7 @@ from scipy.optimize import linear_sum_assignment
 from models.dynamic_cnn_attention_for_segmentation import DynamicCNN
 
 device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
+print(f"Using device: {device}.")
 
 # Directories
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -27,31 +28,61 @@ in_channels = 1
 out_channels = 1
 batch_size = 1  # Batch size = 1 simplifies dealing with variable image sizes.
 learning_rate = 0.001
-num_epochs = 50
+num_epochs = 500
 
 
 def compute_cost_matrix(pred, gt):
     """
-    pred: [num_kernels, H, W] (GPU tensor)
-    gt: [num_tabs, H, W] (GPU tensor)
+    pred: [num_kernels, H, W] - predicted masks
+    gt: [num_tabs, H, W] - ground truth masks
 
-    Compute Dice-based cost fully on GPU:
-    We never call pred.numpy() or gt.numpy() here.
+    Compute Dice-based cost in a vectorized manner:
+    - intersection is computed via einsum
+    - sums are computed once and broadcasted
+    - no Python loops required
     """
-    num_kernels, H, W = pred.shape
-    num_tabs = gt.shape[0]
-    # cost_matrix: tensor [num_kernels, num_tabs]
-    cost_matrix = torch.zeros(num_kernels, num_tabs, device=pred.device, dtype=torch.float32)
 
-    # Compute dice cost in a loop on GPU
-    # This loop is typically small since num_kernels and num_tabs are manageable.
-    for i in range(num_kernels):
-        for j in range(num_tabs):
-            intersection = (pred[i] * gt[j]).sum()
-            dice_coeff = (2.0 * intersection) / (pred[i].sum() + gt[j].sum() + 1e-5)
-            cost_matrix[i, j] = 1.0 - dice_coeff
+    # intersection: shape [num_kernels, num_tabs]
+    intersection = torch.einsum('ihw,jhw->ij', pred, gt)
+
+    # sum_pred: [num_kernels], sum_gt: [num_tabs]
+    sum_pred = pred.sum(dim=(1, 2))
+    sum_gt = gt.sum(dim=(1, 2))
+
+    # dice_coeff: [num_kernels, num_tabs]
+    # Broadcasting:
+    # sum_pred[:, None] gives shape [num_kernels, 1]
+    # sum_gt[None, :] gives shape [1, num_tabs]
+    dice_coeff = (2.0 * intersection) / (sum_pred[:, None] + sum_gt[None, :] + 1e-5)
+
+    # cost_matrix: [num_kernels, num_tabs]
+    cost_matrix = 1.0 - dice_coeff
 
     return cost_matrix
+
+
+# def compute_cost_matrix(pred, gt):
+#     """
+#     pred: [num_kernels, H, W] (GPU tensor)
+#     gt: [num_tabs, H, W] (GPU tensor)
+#
+#     Compute Dice-based cost fully on GPU:
+#     We never call pred.numpy() or gt.numpy() here.
+#     """
+#     num_kernels, H, W = pred.shape
+#     num_tabs = gt.shape[0]
+#     # cost_matrix: tensor [num_kernels, num_tabs]
+#     cost_matrix = torch.zeros(num_kernels, num_tabs, device=pred.device, dtype=torch.float32)
+#
+#     # Compute dice cost in a loop on GPU
+#     # This loop is typically small since num_kernels and num_tabs are manageable.
+#     for i in range(num_kernels):
+#         for j in range(num_tabs):
+#             intersection = (pred[i] * gt[j]).sum()
+#             dice_coeff = (2.0 * intersection) / (pred[i].sum() + gt[j].sum() + 1e-5)
+#             cost_matrix[i, j] = 1.0 - dice_coeff
+#
+#     return cost_matrix
 
 def hungarian_match(pred, gt):
     """
@@ -86,6 +117,74 @@ def hungarian_match(pred, gt):
     sorted_pairs = sorted(zip(row_ind, col_ind), key=lambda x: x[1])
     for i, (pred_idx, gt_idx) in enumerate(sorted_pairs):
         perm_pred[i] = pred[pred_idx]
+
+    return perm_pred
+
+
+def sinkhorn_knopp(C, max_iter=50, eps=1e-3):
+    """
+    C: [num_kernels, num_tabs] cost matrix on GPU
+    max_iter: number of iterations
+    eps: regularization scaling
+
+    Convert cost matrix to a doubly-stochastic matrix using the Sinkhorn-Knopp algorithm.
+    We take negative cost scaled by 1/eps as logits, then apply iterative row/column normalization.
+    """
+    # Convert cost to logits (lower cost = higher logit)
+    # Using negative cost / eps as "score"
+    logits = -C / eps
+
+    # Start with softmax over rows
+    P = torch.softmax(logits, dim=1)  # Normalize rows
+
+    for _ in range(max_iter):
+        # Normalize columns
+        P = P / (P.sum(dim=0, keepdim=True) + 1e-9)
+        # Normalize rows
+        P = P / (P.sum(dim=1, keepdim=True) + 1e-9)
+
+    return P
+
+
+def sinkhorn_match(pred, gt, max_iter=50, eps=1e-3):
+    """
+    pred: [num_kernels, H, W] predicted masks
+    gt: [num_tabs, H, W] ground truth masks
+
+    Use sinkhorn_knopp to approximate the optimal matching:
+    1. Compute cost matrix.
+    2. Run sinkhorn to get a doubly-stochastic matrix P.
+    3. Extract assignments by picking max in each column.
+    4. Reorder pred to match gt order.
+
+    All operations stay on GPU.
+    """
+    num_kernels, H, W = pred.shape
+    num_tabs = gt.shape[0]
+
+    if num_tabs == 0:
+        # No tabs, just return an empty corresponding shape
+        return gt.clone()
+
+    # Compute cost on GPU
+    cost_matrix = compute_cost_matrix(pred, gt)  # [num_kernels, num_tabs]
+
+    # Run sinkhorn-knopp
+    P = sinkhorn_knopp(cost_matrix, max_iter=max_iter, eps=eps)
+    # P is [num_kernels, num_tabs], a doubly-stochastic matrix approximating a permutation
+
+    # Extract assignments:
+    # For each gt tab (column), pick the predicted channel with max probability
+    # col_ind: predicted channel per ground truth tab
+    # By taking argmax along dim=0 (columns), we get max over each column
+    # However, torch.argmax only works along a single dimension, so we transpose P.
+    # Actually, let's just do P.T and argmax over dim=0 for clarity:
+    # P.T: [num_tabs, num_kernels] - now each row is a gt tab, we pick max predicted channel
+    _, col_ind = P.T.max(dim=1)  # col_ind[j] = matched pred for gt[j]
+
+    perm_pred = torch.zeros_like(gt)
+    for j in range(num_tabs):
+        perm_pred[j] = pred[col_ind[j]]
 
     return perm_pred
 
@@ -172,7 +271,7 @@ val_size = int(dataset_size * val_ratio)
 train_size = dataset_size - val_size
 train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
 # Initialize model, optimizer, and loss
@@ -183,7 +282,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 criterion = nn.BCELoss()  # Binary cross-entropy for segmentation masks
 
 # ---------------------------------------
-# Training Loop with Hungarian Matching
+# Training Loop with Hungarian or Sinkhorn approximation Matching
 # ---------------------------------------
 for epoch in range(num_epochs):
     model.train()
@@ -231,6 +330,7 @@ for epoch in range(num_epochs):
 
             if gt_single.shape[0] > 0:
                 perm_pred = hungarian_match(pred_single, gt_single)
+                # perm_pred = sinkhorn_match(pred_single, gt_single, max_iter=50, eps=1e-3)
                 perm_pred = perm_pred.unsqueeze(0)
                 gt_single = gt_single.unsqueeze(0)
                 v_loss = criterion(perm_pred, gt_single)
