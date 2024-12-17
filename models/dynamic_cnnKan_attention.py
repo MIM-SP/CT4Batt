@@ -1,18 +1,23 @@
 
 import os
 import sys
+# Add the project root directory to sys.path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from kan_linear import KANLinear
-from dynamic_cnn_attention import Attention2D
+from models.kan_linear import KANLinear
+from models.dynamic_cnn_attention_roi import Attention2D
 
-class CNN2D(nn.Module):
+class CNN2DKan(nn.Module):
     """
     Dynamic 2D Convolution with attention-based kernel selection.
     """
     def __init__(self, in_channels, out_channels, base=64, kernel_size=3, ratio=0.25, stride=1, padding=0, dilation=1, groups=1, bias=True, num_kernels=4, temperature=34, activation_fn=nn.ReLU, init_weight=True):
-        super(CNN2D, self).__init__()
+        super(CNN2DKan, self).__init__()
         assert in_channels % groups == 0, "Input channels must be divisible by groups."
         
         self.in_channels = in_channels

@@ -1,15 +1,19 @@
-
 import os
 import sys
 import torch
+# Add the project root directory to sys.path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 import torch.nn as nn
 import torch.nn.functional as F
-from cnn_attention import AttentionModule
-from kan_linear import KANLinear
+from models.cnn_attention import AttentionModule
+from models.kan_linear import KANLinear
 
-class CNNWithAttention(nn.Module):
+class CNNKanWithAttention(nn.Module):
     def __init__(self, in_channels=1, out_channels=1, base=64, kernel_size=3, activation_fn=nn.ReLU):
-        super(CNNWithAttention, self).__init__()
+        super(CNNKanWithAttention, self).__init__()
         
         self.activation_fn = activation_fn()
         
