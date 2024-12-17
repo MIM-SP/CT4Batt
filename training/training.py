@@ -21,49 +21,30 @@ device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.b
 
 # Lightweight Perceptual Loss using VGG11
 class PerceptualLoss(nn.Module):
-    def __init__(self, layers=[2, 5, 8], loss_fn=nn.L1Loss(), device=None):
-        """
-        Lightweight Perceptual Loss using VGG11.
-
-        Args:
-            layers (list): VGG layer indices to extract features.
-            loss_fn (nn.Module): Loss function to compare feature maps.
-            device (torch.device): Device for running the VGG model.
-        """
+    def __init__(self, layers=[3], device= torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))):
         super(PerceptualLoss, self).__init__()
-        self.device = device if device else torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
-        self.vgg = models.vgg11(weights=models.VGG11_Weights.IMAGENET1K_V1).features.to(self.device).eval()
-        
+        self.vgg = models.vgg16(pretrained=True).features[:16].to(device).eval()
+        self.layers = layers
         for param in self.vgg.parameters():
             param.requires_grad = False  # Freeze VGG weights
 
-        self.layers = layers
-        self.loss_fn = loss_fn
-
-    def forward(self, generated, target):
-        loss = 0.0
-
-        # Move tensors to device and ensure 3 channels
-        generated = generated.to(self.device)
-        target = target.to(self.device)
-        if generated.shape[1] == 1 and target.shape[1] == 1:
-            generated = generated.repeat(1, 3, 1, 1)
-            target = target.repeat(1, 3, 1, 1)
-
-        x_gen = generated
-        x_target = target
-
-        # Extract features and compute loss
-        for idx, layer in enumerate(self.vgg):
-            x_gen = layer(x_gen)
-            x_target = layer(x_target)
-            if idx in self.layers:
-                loss += self.loss_fn(x_gen, x_target)
-
+    def forward(self, pred, target):
+        loss = 0
+        for layer in self.layers:
+            pred_feat = self.vgg[:layer](pred)
+            target_feat = self.vgg[:layer](target)
+            loss += F.l1_loss(pred_feat, target_feat)
         return loss
 
+def total_variation_loss(image):
+    tv_h = torch.mean(torch.abs(image[:, :, 1:, :] - image[:, :, :-1, :]))
+    tv_w = torch.mean(torch.abs(image[:, :, :, 1:] - image[:, :, :, :-1]))
+    return tv_h + tv_w
+
+def total_variation_loss(image):
+    tv_h = torch.mean(torch.abs(image[:, :, 1:, :] - image[:, :, :-1, :]))
+    tv_w = torch.mean(torch.abs(image[:, :, :, 1:] - image[:, :, :, :-1]))
+    return tv_h + tv_w
 
 # Compute Loss Function
 def compute_loss(outputs, targets, perceptual_loss_fn):
@@ -81,26 +62,45 @@ def compute_loss(outputs, targets, perceptual_loss_fn):
     #perceptual_loss = perceptual_loss_fn(outputs, targets)
 
     # Weighted loss
-    loss = 0.5 * pixel_loss + 0.5 * ssim_loss
+    #loss = 0.4 * pixel_loss + 0.4 * ssim_loss + 0.2 * perceptual_loss
+    loss=ssim_loss
     return loss
 
-def initialize_weights(m):
-    if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
-        nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
-        if m.bias is not None:
-            nn.init.constant_(m.bias, 0)
 
-def compute_simple_loss(outputs, targets):
-    """Compute simple pixel-wise L1 loss."""
-    # Resize targets to match outputs shape
-    targets_resized = F.interpolate(targets, size=outputs.shape[2:], mode='bilinear', align_corners=False)
+def compute_simple_loss(pred, target, perceptual_loss_fn=None, tv_weight=0.01):
+    """
+    Compute combined loss: L1 Loss + Perceptual Loss + Total Variation Loss.
 
-    return F.l1_loss(outputs, targets_resized)
+    Args:
+        pred (torch.Tensor): Model predictions.
+        target (torch.Tensor): Ground truth.
+        perceptual_loss_fn (callable, optional): Function for perceptual loss.
+        tv_weight (float): Weight for total variation loss.
+
+    Returns:
+        torch.Tensor: Combined loss value.
+    """
+    # Pixel-wise L1 loss
+    l1_loss = F.l1_loss(pred, target)
+
+    # Perceptual loss (if provided)
+    perceptual_loss = 0
+    if perceptual_loss_fn is not None:
+        perceptual_loss = perceptual_loss_fn(pred, target)
+
+    # Total variation loss
+    tv_loss = total_variation_loss(pred)
+
+    # Combine losses
+    total_loss = l1_loss + perceptual_loss + tv_weight * tv_loss
+
+    return total_loss
 
 
 def train(config, train_loader, val_loader, train_mean, train_std):
     # Simplified Perceptual Loss
-    perceptual_loss_fn = PerceptualLoss(layers=[0, 2, 4], loss_fn=nn.L1Loss())  # Shallow layers
+    perceptual_loss_fn = PerceptualLoss(device=device)
+
 
     # Model initialization
     '''
@@ -122,11 +122,11 @@ def train(config, train_loader, val_loader, train_mean, train_std):
         temperature=config["temperature"],
         activation_fn=getattr(nn, config["activation_fn"]),
     ).to(device)
-    model.apply(initialize_weights)  # Apply weight initialization
 
     optimizer = optim.Adam(model.parameters(), lr=config["lr"])
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2)
-    num_epochs=2000
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
+    criterion = nn.MSELoss()
+    num_epochs=200
     for epoch in range(num_epochs):  # Fewer epochs for testing
         model.train()
         running_loss = 0.0
@@ -136,10 +136,18 @@ def train(config, train_loader, val_loader, train_mean, train_std):
             optimizer.zero_grad()
             outputs = model(images_org)  # Forward pass
 
-            loss = compute_loss(outputs, images_crop, perceptual_loss_fn)
-            #loss = compute_simple_loss(outputs, images_crop)
+            #loss = compute_loss(outputs, images_crop, perceptual_loss_fn)
+
+            denormalized_output = denormalize(outputs, train_mean, train_std)
+            denormalized_target = denormalize(images_crop, train_mean, train_std)
+            denormalized_output = denormalized_output.clamp(-1, 1)
+            denormalized_target = denormalized_target.clamp(-1, 1)
+
+            loss = criterion(denormalized_output, denormalized_target)
 
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
             optimizer.step()
             running_loss += loss.item()
 
@@ -149,8 +157,14 @@ def train(config, train_loader, val_loader, train_mean, train_std):
             for images_org, images_crop in val_loader:
                 images_org, images_crop = images_org.to(device), images_crop.to(device)
                 outputs = model(images_org)
-                loss = compute_loss(outputs, images_crop, perceptual_loss_fn)
-                #loss = compute_simple_loss(outputs, images_crop)
+                #loss = compute_loss(outputs, images_crop, perceptual_loss_fn)
+
+                denormalized_output = denormalize(outputs, train_mean, train_std)
+                denormalized_target = denormalize(images_crop, train_mean, train_std)
+                denormalized_output = denormalized_output.clamp(-1, 1)
+                denormalized_target = denormalized_target.clamp(-1, 1)
+
+                loss = criterion(denormalized_output, denormalized_target)
 
                 val_loss += loss.item()
         avg_train_loss = running_loss / len(train_loader)
@@ -161,7 +175,7 @@ def train(config, train_loader, val_loader, train_mean, train_std):
               f"Val Loss: {val_loss/len(val_loader):.4f}")
 
         # Visualization at last epoch
-        if epoch // 100:
+        if epoch % 10 == 0:
             visualize_predictions(outputs,images_crop,train_mean,train_std)
 
             if hasattr(model, 'update_temperature'):
