@@ -87,9 +87,7 @@ analysis = tune.run(
     tune.with_parameters(train, train_loader=train_loader, val_loader=val_loader, train_mean=train_mean, train_std=train_std),
     resources_per_trial={"cpu": 1,"memory": 4 * 1024 * 1024 * 1024},
     config=search_space,
-    num_samples=600,
+    num_samples=100,
     scheduler=scheduler,
     search_alg=search_alg
 )
-
-print("Best hyperparameters found were: ", analysis.best_config)

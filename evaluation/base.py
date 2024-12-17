@@ -72,7 +72,7 @@ config = {
     'lr':0.00241224 ,
     'ratio':0.320002 ,
     'stride':1,
-    'num_kernels':3,
+    'num_kernels':4,
     'temperature':1.11906 
 }
 
