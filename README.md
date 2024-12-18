@@ -1,6 +1,6 @@
 <div align="center">
    
-# CT4Batt: Machine Learning Tools for X-ray CT Electrode Analysis
+# CT4Batt: A pipeline for Analyzing X-ray Chromatography Battery Images
    
 <img src="battery.png" alt="Header Image" style="width:50%;" />
 
