@@ -75,7 +75,6 @@ Obtained Predictions from Test Dataset:
 We utilized the **X-ray-PBD dataset**, which includes a variety of X-ray images of electrode stacks. The dataset features:
 - High variability in tab shapes, arrangements, and resolutions.
 - Images from different scales and equipment settings.
-- Link for the dataset: https://github.com/Xiaoqi-Zhao-DLUT/X-ray-PBD?tab=readme-ov-file  
 ---
 
 ## ⚙️ How to Use
