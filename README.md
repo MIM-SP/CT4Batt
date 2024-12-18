@@ -1,5 +1,10 @@
+<div align="center">
+   
 # CT4Batt: Machine Learning Tools for X-ray CT Electrode Analysis
-![Header Image](battery.png)
+   
+<img src="battery.png" alt="Header Image" style="width:50%;" />
+
+</div>
 
 This project explores a two-step machine learning approach for analyzing X-ray images of electrode stacks, using publicly available data from the X-ray-PBD dataset. The overarching goal is to identify and zoom in on the electrode tab region, and then isolate each individual electrode tab through segmentation.
 
@@ -131,4 +136,5 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## 👩‍💻 Authors
 **Amir Taqieddin** and **Forrest Laskowski**
+
 **Affilation**: Solid Power Operating Inc., Louisville, CO 80027
