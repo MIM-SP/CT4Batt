@@ -84,7 +84,7 @@ We utilized the **X-ray-PBD dataset**, which includes a variety of X-ray images 
 - Images from different scales and equipment settings.
 ---
 
-## ⚙️ How to Use
+## ⚙️ How to use Bounding Box Prediction
 Follow these steps to get started:
 
 1. **Clone the Repository**
@@ -104,6 +104,25 @@ Follow these steps to get started:
    ```
 ---
 
+## ⚙️ How to use Watershed Segmentation of tabs
+Follow these steps to get started:
+
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/your_username/CT4Batt.git
+   cd CT4Batt
+   ```
+
+2. **Prepare the Dataset**
+   - Download the X-ray-PBD dataset, placing images into segmentor/images_repo and masks into segmentor/masks_repo
+   - Run the random_image_selector.inypb helper to randomly select images for analysis
+
+3. **Run ct_segmention.py**
+   - On the first screen, use the watershed segmentation toggles to select the bulk battery, without the tabs
+   - On the second screen, use right/left-click-and-drag to help isolate the tabs from each other
+   - Upon pressing confirm a numpy array of all the tab pixels is saved in the results folder, under the segmentor directory
+---
+
 ## 📚 References
 1. **X-ray-PBD Dataset**: [Dataset link](https://github.com/Xiaoqi-Zhao-DLUT/X-ray-PBD?tab=readme-ov-file)
 2. **Source for KAN layer code**: [KAN](https://github.com/jakariaemon/CNN-KAN/blob/main/cnn_KAN.py)
@@ -116,6 +135,10 @@ Below are some examples of bounding box prediction and segmentation results:
 ### Bounding Box Prediction
 ![Bounding Box Result](evaluation/Model_B.png)
 
+### Watershed Segmentation
+![Bulk Battery Isolation](watershed1.PNG)
+
+![Tab Segmentation](watershed2.PNG)
 ---
 
 ## 🌟 Future Work
