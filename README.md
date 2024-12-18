@@ -122,7 +122,7 @@ Below are some examples of bounding box prediction and segmentation results:
 This framework can be extended to:
 - Incorporate advanced instance segmentation techniques.
 - Enhance attention modules for improved feature extraction.
-- Add shape priors for better performance on complex geometries.
+- Add shape priors for better performance on batteries with complex geometries.
 
 ---
 
