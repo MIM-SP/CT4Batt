@@ -104,7 +104,7 @@ Follow these steps to get started:
    ```
 ---
 
-## ⚙️ How to use Watershed Segmentation of tabs
+## ⚙️ How to use Watershed Segmentation of Tabs
 Follow these steps to get started:
 
 1. **Clone the Repository**
