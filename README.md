@@ -16,6 +16,8 @@ By carefully crafting each stage—first bounding box prediction, then targeted 
 
 Looking ahead, this framework can be further extended and refined. While the current pipeline focuses on bounding box regression and binary segmentation, future iterations could incorporate more advanced instance segmentation techniques, improved attention modules, or additional shape priors. For now, this two-part solution provides a strong starting point for automated electrode tab detection and segmentation in complex X-ray imagery.
 
+**Note:** This work was developed during the 2-days [Microscopy Hackathon](https://kaliningroup.github.io/mic-hackathon/).
+
 ---
 
 ## 🚀 Overview
