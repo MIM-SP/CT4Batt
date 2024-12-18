@@ -18,6 +18,8 @@ Looking ahead, this framework can be further extended and refined. While the cur
 
 **Note:** This work was developed during the 2-days [Microscopy Hackathon](https://kaliningroup.github.io/mic-hackathon/).
 
+[Video Summary](https://solidpower-my.sharepoint.com/:v:/g/personal/forrest_laskowski_solidpowerbattery_com/ERW033EM8uBIvnGpVUxXA7MBnzIrE-NSe4fnD5X-yNcFeA?e=kuxrcg)
+
 ---
 
 ## 🚀 Overview
