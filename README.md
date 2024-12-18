@@ -1,2 +1,10 @@
-# AutoCT4Batt
-Automatic detection of deformation in batteries from X-ray Computed Tomography (CT) images
+# CT4Batt
+This project explores a two-step machine learning approach for analyzing X-ray images of electrode stacks, using publicly available data from the X-ray-PBD dataset. The overarching goal is to identify and zoom in on the electrode tab region, and then isolate each individual electrode tab through segmentation.
+
+In the first step, we focus on automatically locating a bounding box around the electrode tabs. We introduce a specialized convolutional neural network (CNN) equipped with attention mechanisms. This network employs coordinate attention, sliding window attention, and residual feature extractors to refine its understanding of the complex electrode structure. By predicting bounding boxes directly from the image, the network ensures that the downstream segmentation process can focus on a well-defined region of interest, thereby simplifying subsequent steps.
+
+After obtaining a well-defined bounding region, the second part of the pipeline performs a segmentation task to isolate individual electrode tabs. We convert the zoomed-in, masked region into a series of probability maps, each intended to represent a distinct electrode tab. Using a dynamic approach, the model can handle images with variable sizes and different numbers of tabs. Each output channel of the segmentation model corresponds to a single tab, allowing us to extract a 3D array (Num_Tabs × Height × Width) of binary masks, where each mask highlights one tab at a time.
+
+By carefully crafting each stage—first bounding box prediction, then targeted segmentation—we achieve a flexible and robust solution. The result is a system that can handle highly variable imagery: from the subtle differences in electrode tab shapes and arrangements to the diverse image resolutions and scales encountered in X-ray data. Our approach enables straightforward post-processing, visualization, and quantitative analysis of each tab in the electrode stack.
+
+Looking ahead, this framework can be further extended and refined. While the current pipeline focuses on bounding box regression and binary segmentation, future iterations could incorporate more advanced instance segmentation techniques, improved attention modules, or additional shape priors. For now, this two-part solution provides a strong starting point for automated electrode tab detection and segmentation in complex X-ray imagery.
