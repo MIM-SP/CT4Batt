@@ -15,8 +15,8 @@ from torch.utils.data import DataLoader
 device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
 
 # import the images
-image_dir='/Users/amir.taqieddin/Desktop/Hackathon/X-ray-PBD-main/x_ray_pbd_datasets/train/img'
-image_dir2='/Users/amir.taqieddin/Desktop/Hackathon/X-ray-PBD-main/x_ray_pbd_datasets/train/crop_mask'
+image_dir='path/to/dataset/X-ray-PBD-main/x_ray_pbd_datasets/train/img'
+image_dir2='path/to/dataset/X-ray-PBD-main/x_ray_pbd_datasets/train/crop_mask'
 
 dataset = ImageDataset(image_dir, image_dir2, mean=[0], std=[1]) # no normalization 
 
