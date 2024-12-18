@@ -61,29 +61,6 @@ def compute_cost_matrix(pred, gt):
     return cost_matrix
 
 
-# def compute_cost_matrix(pred, gt):
-#     """
-#     pred: [num_kernels, H, W] (GPU tensor)
-#     gt: [num_tabs, H, W] (GPU tensor)
-#
-#     Compute Dice-based cost fully on GPU:
-#     We never call pred.numpy() or gt.numpy() here.
-#     """
-#     num_kernels, H, W = pred.shape
-#     num_tabs = gt.shape[0]
-#     # cost_matrix: tensor [num_kernels, num_tabs]
-#     cost_matrix = torch.zeros(num_kernels, num_tabs, device=pred.device, dtype=torch.float32)
-#
-#     # Compute dice cost in a loop on GPU
-#     # This loop is typically small since num_kernels and num_tabs are manageable.
-#     for i in range(num_kernels):
-#         for j in range(num_tabs):
-#             intersection = (pred[i] * gt[j]).sum()
-#             dice_coeff = (2.0 * intersection) / (pred[i].sum() + gt[j].sum() + 1e-5)
-#             cost_matrix[i, j] = 1.0 - dice_coeff
-#
-#     return cost_matrix
-
 def hungarian_match(pred, gt):
     """
     pred: [num_kernels, H, W] (GPU)
