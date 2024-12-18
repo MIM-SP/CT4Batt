@@ -2,7 +2,7 @@
    
 # CT4Batt: A pipeline for Analyzing X-ray Chromatography Battery Images
    
-<img src="header_battery.webp" alt="Header Image" style="width:50%;" />
+<img src="header_battery.webp" alt="Header Image" style="width:75%;" />
 
 </div>
 
